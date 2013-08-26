@@ -1,0 +1,219 @@
+<?php
+/**
+ * @file
+ * Base module file for user_events
+ *
+ * @defgroup user_events User Events
+ * @{
+ */
+
+/**
+ * @var USER_EVENTS_NEW
+ */
+define('USER_EVENTS_NEW', 0);
+
+/**
+ * @var USER_EVENTS_BLOCKED
+ */
+define('USER_EVENTS_BLOCKED', 2);
+
+/**
+ * @var USER_EVENTS_INVITED
+ */
+define('USER_EVENTS_INVITED', 3);
+
+/**
+ * @var USER_EVENTS_PARTICIPATED
+ */
+define('USER_EVENTS_PARTICIPATED', 1);
+
+/**
+ * @var USER_EVENTS_DECLINED
+ */
+define('USER_EVENTS_DECLINED', 4);
+
+/**
+ * Return user status code for an event
+ *
+ * @param string $event_name
+ * @param int $uid
+ *   (Optional) Defaults to $GLOBALS['user']->uid.
+ *
+ * @return int
+ *   One of USER_EVENTS_NEW, USER_EVENTS_BLOCKED, etc ...
+ *
+ * @tested
+ */
+function user_events_get_account_status($event_name, $uid = NULL) {
+  if ($user_event = user_events_get_account_event($event_name, $uid)) {
+    return (int) $user_event['status'];
+  }
+  return (int) USER_EVENTS_NEW;
+}
+
+/**
+ * Return the status of a user related to a single event
+ *
+ * @param string $event_name
+ * @param int $uid
+ *   (Optional) Defaults to $GLOBALS['user']->uid.
+ *
+ * @return array
+ *
+ * @tested
+ */
+function user_events_get_account_event($event_name, $uid = NULL) {
+  if ($uid === NULL) {
+    $uid = $GLOBALS['user']->uid;
+  }
+  $event_id = _user_events_get_id_by_name($event_name);
+
+  $data = db_select('user_events', 'e')
+    ->fields('e', array('status', 'time'))
+    ->condition('event_id', $event_id)
+    ->condition('uid', $uid)
+    ->execute()->fetchAssoc();
+
+  if (empty($data)) {
+    $data = array(
+      'status' => USER_EVENTS_NEW,
+      'time' => time(),
+    );
+  }
+
+  $event = array('uid' => $uid) + $data + user_events_get_event($event_name);
+
+  return $event;
+}
+
+/**
+ * Set the user status for an event
+ *
+ * @param string $event_name
+ * @param int $status
+ * @param int $uid
+ *   (Optional) Defaults to $GLOBALS['user']->uid.
+ * @param bool $update
+ *   (Optional) Defaults to FALSE. Set this to TRUE and the previous status will
+     be updated.  While FALSE you cannot alter any status except USER_EVENTS_NEW.
+ *
+ * @tested
+ */
+function user_events_set_account_event($event_name, $status, $uid = NULL, $update = FALSE) {
+  if ($uid === NULL) {
+    $uid = $GLOBALS['user']->uid;
+  }
+  $event_id = _user_events_get_id_by_name($event_name);
+
+  // Delete the record if we're to update the event
+  if ($update) {
+    db_delete('user_events')
+      ->condition('event_id', $event_id)
+      ->condition('uid', $uid)
+      ->execute();
+  }
+
+  // Only write the record if there is no record
+
+  if (user_events_get_account_status($event_name, $uid) === USER_EVENTS_NEW) {
+    $record = array(
+      'event_id' => $event_id,
+      'uid' => $uid,
+      'status' => $status,
+      'time' => time(),
+    );
+    drupal_write_record('user_events', $record);
+  }
+}
+
+/**
+ * Return all registered user events
+ *
+ * @param int|string $event
+ *   (Optional) Defaults to NULL.  Do not include if you want all events returned.
+ *
+ * @return array
+ *   When $event is NULL, Keys are the event_names.
+ *   Values of each event are:
+ *   - id
+ *   - name
+ *   - module
+ *   - title
+ *   - description
+ *
+ * @tested
+ */
+function user_events_get_event($event = NULL) {
+  $events = &drupal_static(__FUNCTION__, array());
+  if (empty($events)) {
+    $events = array();
+    $info = module_invoke_all('user_events_info');
+    foreach ($info as $i) {
+      if (array_key_exists($i['name'], $events)) {
+        throw new Exception(t('Duplicated event name: %name', array(
+          '%name' => $i['name'],
+        )));
+      }
+      $events[$i['name']] = array(
+        'id' => _user_events_get_id_by_name($i['name']),
+      ) + $i;
+    }
+    drupal_alter('user_events_info', $events);
+  }
+
+  if ($event === NULL) {
+    return $events;
+  }
+
+  if (is_numeric($event)) {
+    $map = array_flip(_user_events_get_map());
+    $event = $map[$event];
+  }
+
+  return array_key_exists($event, $events) ? $events[$event] : array();
+}
+
+/**
+ * Return the event id by event name
+ *
+ * This function will make sure that an id exists, and if not it will create the
+   db record to hold the id.
+ *
+ * @param string $event_name
+ *
+ * @return int
+ */
+function _user_events_get_id_by_name($event_name) {
+  $map = _user_events_get_map();
+
+  if (!array_key_exists($event_name, $map)) {
+    $record = array(
+      'event_name' => $event_name,
+    );
+    drupal_write_record('user_event_names', $record);
+    $map[$event_name] = $record['event_id'];
+  }
+
+  return $map[$event_name];
+}
+
+/**
+ * Return a user id event map
+ *
+ * @param type $string
+ *   description
+ *
+ * @return array
+ *   keys are the event names, values are the event ids
+ */
+function _user_events_get_map() {
+  $map = &drupal_static(__FUNCTION__, array());
+
+  if (empty($map)) {
+    $map = db_select('user_event_names', 'n')
+      ->fields('n', array('event_name', 'event_id'))
+      ->execute()->fetchAllKeyed();
+  }
+
+  return $map;
+}

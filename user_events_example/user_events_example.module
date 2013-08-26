@@ -1,0 +1,33 @@
+<?php
+/**
+ * @file
+ * Base module file for user_events_example
+ *
+ * @defgroup user_events_example User Events Example
+ * @{
+ */
+
+/**
+ * Implements hook_user_events_info().
+ *
+ * @return array
+ *   Each element is an array describing an event:
+ *   - name
+ *   - title
+ *
+ */
+function user_events_example_user_events_info() {
+  return array(
+    array(
+      'name' => 'birthday_18',
+      'title' => t('The user turns 18'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_user_events_info_alter().
+ */
+function user_events_example_user_events_info_alter(&$events) {
+  $events['birthday_18']['title'] = t('The user celebrated their eighteenth birthday!');
+}

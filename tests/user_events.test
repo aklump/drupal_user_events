@@ -1,0 +1,174 @@
+<?php
+/**
+ * @file
+ * Tests for the user_events module
+ *
+ * @ingroup user_events
+ * @{
+ */
+
+class UserEventsWebTestCase extends DrupalWebTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'User Events Integration tests',
+      'description' => 'Integration testing for the User Events module.',
+      'group' => 'User Events',
+    );
+  }
+  public function setUp($modules = array()) {
+    if (!is_array($modules)) {
+      $modules = func_get_args();
+    }
+    // List the modules you need to enable for testing
+    $modules += array('user_events', 'user_events_example');
+    $modules = array_unique($modules);
+    parent::setUp($modules);
+  }
+
+  public function testGroup1() {
+    $this->subtest__user_events_get_event();
+    $this->subtest__user_events_get_account_status();
+  }
+
+  public function subtest__user_events_get_event() {
+    /**
+     * Assert empty argument returns an array of events
+     */
+    $_control_group = 'user_events_get_event';
+    // Desired test result
+    $control = array(
+      'birthday_18' => array(
+        'id' => 1,
+        'name' => 'birthday_18',
+        'title' => t('The user celebrated their eighteenth birthday!'),
+      ),
+    );
+    // The test and result
+    $return = user_events_get_event();
+    $result = $return;
+    $this->assertEqual($control, $result, "Assert empty argument returns an array of events", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert passing the event name returns correct event
+     */
+    $_control_group = 'user_events_get_event';
+    // Desired test result
+    $control = array(
+      'id' => 1,
+      'name' => 'birthday_18',
+      'title' => t('The user celebrated their eighteenth birthday!'),
+    );
+    // The test and result
+    $return = user_events_get_event('birthday_18');
+    $result = $return;
+    $this->assertEqual($control, $result, "Assert passing the event name returns correct event", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert passing the event id returns the correct event
+     */
+    $_control_group = 'user_events_get_event';
+    // Desired test result
+    $control = array(
+      'id' => 1,
+      'name' => 'birthday_18',
+      'title' => t('The user celebrated their eighteenth birthday!'),
+    );
+    // The test and result
+    $return = user_events_get_event(1);
+    $result = $return;
+    $this->assertEqual($control, $result, "Assert passing the event id returns the correct event", $_control_group);
+    // END ASSERT
+  }
+
+  public function subtest__user_events_get_account_status() {
+    /**
+     * Assert calling for account status returns USER_EVENTS_NEW initially for current user
+     */
+    $_control_group = 'user_events_get_account_status';
+    // Desired test result
+    $control = USER_EVENTS_NEW;
+    // The test and result
+    $return = user_events_get_account_status('birthday_18');
+    $result = $return;
+    $this->assertIdentical($control, $result, "Assert calling for account status returns USER_EVENTS_NEW initially for current user", $_control_group);
+    // END ASSERT
+
+    $_control_account = $this->drupalCreateUser();
+
+    /**
+     * Assert calling for account status returns USER_EVENTS_NEW initially for specified user
+     */
+    $_control_group = 'user_events_get_account_status';
+    // Desired test result
+    $control = USER_EVENTS_NEW;
+    // The test and result
+    $return = user_events_get_account_status('birthday_18', $_control_account->uid);
+    $result = $return;
+    $this->assertIdentical($control, $result, "Assert calling for account status returns USER_EVENTS_NEW initially for specified user", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert setting the event the first time works
+     */
+    $_control_group = 'user_events_set_account_event';
+    // Desired test result
+    $control = USER_EVENTS_PARTICIPATED;
+    // The test and result
+    $subject = 'birthday_18';
+    $return = user_events_set_account_event($subject, USER_EVENTS_PARTICIPATED, $_control_account->uid);
+    $result = user_events_get_account_status($subject, $_control_account->uid);
+    $this->assertIdentical($control, $result, "Assert setting the event the first time works", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert setting the event a second time without the update flag does nothing
+     */
+    $_control_group = 'user_events_set_account_event';
+    // Desired test result
+    $control = USER_EVENTS_PARTICIPATED;
+    // The test and result
+    $subject = 'birthday_18';
+    $return = user_events_set_account_event($subject, USER_EVENTS_DECLINED, $_control_account->uid);
+    $result = user_events_get_account_status($subject, $_control_account->uid);
+    $this->assertIdentical($control, $result, "Assert setting the event a second time without the update flag does nothing.", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert setting the event a second time WITH the update flag sets new value
+     */
+    $_control_group = 'user_events_set_account_event';
+    // Desired test result
+    $control = USER_EVENTS_DECLINED;
+    // The test and result
+    $subject = 'birthday_18';
+    user_events_set_account_event($subject, USER_EVENTS_DECLINED, $_control_account->uid, TRUE);
+    $result = user_events_get_account_status($subject, $_control_account->uid);
+    $this->assertIdentical($control, $result, "Assert setting the event a second time WITH the update flag sets new value.", $_control_group);
+
+    // Assert all keys are present in the return array
+    $control = array();
+    $keys = array(
+      'status', 'uid', 'id', 'name', 'title', 'time'
+    );
+    $result = user_events_get_account_event($subject, $_control_account->uid);
+    $result = array_diff_key($result, array_flip($keys));
+    $this->assertIdentical($control, $result, "Assert all keys are present in the return array", $_control_group);
+
+    // Assert getting the event returns the correct array
+    $control = array(
+      'status' => USER_EVENTS_DECLINED,
+      'uid' => 2,
+      'id' => 1,
+      'name' => $subject,
+      'title' => t('The user celebrated their eighteenth birthday!'),
+    );
+    $result = user_events_get_account_event($subject, $_control_account->uid);
+    unset($result['time']);
+    $this->assertEqual($control, $result, "Assert getting the event returns the correct array", $_control_group);
+    // END ASSERT
+  }
+}
+
+/** @} */ //end of group: user_events

@@ -1,0 +1,86 @@
+<?php
+/**
+ * @file
+ * Handles installation steps for user_events
+ *
+ * @ingroup func_search
+ * @{
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function user_events_schema() {
+  $schema = array();
+
+  $schema['user_event_names'] = array(
+    'description' => t('Map event names to event ids.'),
+    'fields' => array(
+      'event_id' => array(
+        'description' => t('The event id.'),
+        'type' => 'serial',
+        'unsigned' => TRUE, //int, float, numeric only
+      ),
+      'event_name' => array(
+        'type' => 'varchar',
+        'description' => t('The event machine name.'),
+        'length' => 255,
+      ),
+    ),
+    'primary key' => array('event_id'),
+  );
+
+  $schema['user_events'] = array(
+    'description' => t('Track events users participate in.'),
+    'fields' => array(
+      'event_id' => array(
+        'description' => t('The event id.'),
+        'type' => 'int',
+        'unsigned' => TRUE, //int, float, numeric only
+      ),
+      'uid' => array(
+        'description' => t('The user id.'),
+        'type' => 'int',
+        'unsigned' => TRUE, //int, float, numeric only
+      ),
+      'status' => array(
+        'description' => t('The participation status for the user.'),
+        'type' => 'int',
+        'unsigned' => TRUE, //int, float, numeric only
+      ),
+      'time' => array(
+        'description' => t('The time of this event.'),
+        'type' => 'int',
+        'unsigned' => TRUE, //int, float, numeric only
+      ),
+    ),
+    'indexes' => array(
+      'uid' => array('uid'),
+      'event' => array('event_id'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function user_events_uninstall() {
+  $vars = db_select('variable', 'v')
+    ->fields('v', array('name'))
+    ->condition('name', 'user_events%', 'LIKE')
+    ->execute()->fetchCol();
+  foreach ($vars as $var) {
+    variable_del($var);
+  }
+  db_delete('block')
+    ->condition('module', 'user_events')
+    ->execute();
+  db_delete('block_role')
+    ->condition('module', 'user_events')
+    ->execute();
+}
+
+/** @} */ //end of group user_events
+

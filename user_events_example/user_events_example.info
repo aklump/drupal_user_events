@@ -1,0 +1,5 @@
+name = User Events Example
+description = Provides an example on how to implement user events.
+package = Other
+version = 7.x-0.1
+core = 7.x
