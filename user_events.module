@@ -91,38 +91,46 @@ function user_events_get_account_event($event_name, $uid = NULL) {
  *
  * @param string $event_name
  * @param int $status
- * @param int $uid
- *   (Optional) Defaults to $GLOBALS['user']->uid.
+ * @param array|int $uids
+ *   (Optional) Defaults to $GLOBALS['user']->uid. You may provide a single uid
+     as an int or an array of uids.
  * @param bool $update
  *   (Optional) Defaults to FALSE. Set this to TRUE and the previous status will
      be updated.  While FALSE you cannot alter any status except USER_EVENTS_NEW.
  *
  * @tested
  */
-function user_events_set_account_event($event_name, $status, $uid = NULL, $update = FALSE) {
-  if ($uid === NULL) {
-    $uid = $GLOBALS['user']->uid;
+function user_events_set_account_event($event_name, $status, $uids = NULL, $update = FALSE) {
+  $status = (int) $status;
+  if ($uids === NULL) {
+    $uids = $GLOBALS['user']->uid;
   }
   $event_id = _user_events_get_id_by_name($event_name);
 
-  // Delete the record if we're to update the event
-  if ($update) {
-    db_delete('user_events')
-      ->condition('event_id', $event_id)
-      ->condition('uid', $uid)
-      ->execute();
+  if (!is_array($uids)) {
+    $uids = array($uids);
   }
 
-  // Only write the record if there is no record
+  foreach ($uids as $uid) {
+    // Delete the record if we're to update the event
+    if ($update || $status === USER_EVENTS_NEW) {
+      db_delete('user_events')
+        ->condition('event_id', $event_id)
+        ->condition('uid', $uid)
+        ->execute();
+    }
 
-  if (user_events_get_account_status($event_name, $uid) === USER_EVENTS_NEW) {
-    $record = array(
-      'event_id' => $event_id,
-      'uid' => $uid,
-      'status' => $status,
-      'time' => time(),
-    );
-    drupal_write_record('user_events', $record);
+    // Only write the record if there is no record and status is not new
+    if ($status !== USER_EVENTS_NEW
+        && user_events_get_account_status($event_name, $uid) === USER_EVENTS_NEW) {
+      $record = array(
+        'event_id' => $event_id,
+        'uid' => $uid,
+        'status' => $status,
+        'time' => time(),
+      );
+      drupal_write_record('user_events', $record);
+    }
   }
 }
 
@@ -216,4 +224,62 @@ function _user_events_get_map() {
   }
 
   return $map;
+}
+
+/**
+ * Filter a set of uids to those with a given event and status(s)
+ *
+ * @param array $uids
+ * @param string $event_name
+ * @param int $status
+ */
+function user_events_filter_uids(&$uids, $event_name, $status) {
+  if (!$id = _user_events_get_id_by_name($event_name)) {
+    return FALSE;
+  }
+  if ($status == USER_EVENTS_NEW) {
+    $remove = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->condition('event_id', $id)
+      ->execute()->fetchCol();
+    $uids = array_diff($uids, $remove);
+  }
+  else {
+    $uids = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->condition('event_id', $id)
+      ->condition('status', $status)
+      ->execute()->fetchCol();
+  }
+}
+
+/**
+ * Load users by event status
+ *
+ * @param string $event_name
+ * @param int $status
+ *
+ * @return array
+ *   An array of uids
+ */
+function user_events_get_uids($event_name, $status) {
+  if (!$id = _user_events_get_id_by_name($event_name)) {
+    return FALSE;
+  }
+  if ($status === USER_EVENTS_NEW) {
+    $uids = db_select('users', 'u')
+      ->fields('u', array('uid'))
+      ->condition('status', '1')
+      ->execute()->fetchCol();
+    user_events_filter_uids($uids, $event_name, USER_EVENTS_NEW);
+  }
+  else {
+    $uids = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->condition('event_id', $id)
+      ->condition('status', $status)
+      ->execute()->fetchCol();
+  }
+
+  return $uids;
 }

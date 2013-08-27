@@ -168,6 +168,114 @@ class UserEventsWebTestCase extends DrupalWebTestCase {
     unset($result['time']);
     $this->assertEqual($control, $result, "Assert getting the event returns the correct array", $_control_group);
     // END ASSERT
+
+    /**
+     * Assert filtering for new status works
+     */
+    $_control_group = 'user_events_filter_uids';
+    // Desired test result
+    $control = array(2);
+    // The test and result
+    $subject = array(1, 2);
+    user_events_filter_uids($subject, 'birthday_18', USER_EVENTS_DECLINED);
+    $result = $subject;
+    $this->assertEqual($control, $result, "Assert filtering for new status works", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert filtering for new status works
+     */
+    $_control_group = 'user_events_filter_uids';
+    // Desired test result
+    $account = $this->drupalCreateUser();
+    $control = array(1, $account->uid);
+    // The test and result
+    $subject = array(1, 2, $account->uid);
+    user_events_filter_uids($subject, 'birthday_18', USER_EVENTS_NEW);
+    $result = array_values($subject);
+    $this->assertEqual($control, $result, "Assert filtering for new status works", $_control_group);
+    // END ASSERT
+  }
+
+  public function testTableRecords() {
+    db_query("TRUNCATE TABLE {user_events}")->execute();
+
+    $a2 = $this->drupalCreateUser();
+    $a3 = $this->drupalCreateUser();
+    $a4 = $this->drupalCreateUser();
+
+    /**
+     * Assert all three users return as status new
+     */
+    $_control_group = 'user_events_get_uids';
+    // Desired test result
+    $control = array(1, 2, 3, 4);
+    // The test and result
+    $return = user_events_get_uids('birthday_18', USER_EVENTS_NEW);
+    $result = $return;
+    $this->assertEqual($control, $result, "Assert all three users return as status new", $_control_group);
+
+    // Assert there are no records in the table
+    $control = 0;
+    $result = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->countQuery()
+      ->execute()->fetchField();
+    $this->assertEqual($control, $result, "Assert there are no records in the table", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert get uids by event blocked returns correct uids
+     */
+    $_control_group = 'user_events_get_uids';
+    // Desired test result
+    $control = array($a3->uid, $a4->uid);
+    // The test and result
+    $subject = 'birthday_18';
+    user_events_set_account_event($subject, USER_EVENTS_BLOCKED, $control);
+    $return = user_events_get_uids($subject, USER_EVENTS_BLOCKED);
+    $result = $return;
+    $this->assertEqual($control, $result, "Assert get uids by event blocked returns correct uids", $_control_group);
+
+    // Assert there are two records in the table
+    $control = 2;
+    $result = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->countQuery()
+      ->execute()->fetchField();
+    $this->assertEqual($control, $result, "Assert there are two records in the table", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert there are four records in the table after two more added
+     */
+    $_control_group = 'user_events_set_account_event';
+    // Desired test result
+    $control = 4;
+    // The test and result
+    user_events_set_account_event('birthday_18', USER_EVENTS_PARTICIPATED, array(1, $a2->uid));
+    $result = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->countQuery()
+      ->execute()->fetchField();
+    $this->assertEqual($control, $result, "Assert there are four records in the table after two more added", $_control_group);
+    // END ASSERT
+
+    /**
+     * Assert there are zero records in the table after four set to new
+     */
+    $_control_group = 'user_events_set_account_event';
+    // Desired test result
+    $control = 0;
+    // The test and result
+    user_events_set_account_event('birthday_18', USER_EVENTS_NEW, 1);
+    user_events_set_account_event('birthday_18', USER_EVENTS_NEW, array($a2->uid, $a3->uid, $a4->uid));
+    $result = db_select('user_events', 'e')
+      ->fields('e', array('uid'))
+      ->countQuery()
+      ->execute()->fetchField();
+    $this->assertEqual($control, $result, "Assert there are zero records in the table after four set to new", $_control_group);
+    // END ASSERT
   }
 }
 
