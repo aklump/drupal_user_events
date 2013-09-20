@@ -199,6 +199,7 @@ function _user_events_get_id_by_name($event_name) {
       'event_name' => $event_name,
     );
     drupal_write_record('user_event_names', $record);
+    drupal_static_reset('_user_events_get_map');
     $map[$event_name] = $record['event_id'];
   }
 
