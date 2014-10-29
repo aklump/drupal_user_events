@@ -1,7 +1,7 @@
 name = User Events
 description = Provides an API for tracking events that users may participate in.
 package = Other
-version = 7.x-0.2-rc3
+version = "7.x-0.2-rc4"
 core = 7.x
 
 files[] = tests/user_events.test
